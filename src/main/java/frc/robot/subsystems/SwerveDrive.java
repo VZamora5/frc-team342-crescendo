@@ -120,13 +120,14 @@ public class SwerveDrive extends SubsystemBase {
     chassisSpeedSupplier = () -> getChassisSpeeds();
     shouldFlipSupplier = () -> false;
 
-    fieldOriented = true;
-    slowMode = false;
-    ninetyLock = false;
-    zeroLock = false;
+    fieldOriented = true; // Set to true for driver preference
+    slowMode = false; // Whether the robot is running at its maximium speed or not
+    ninetyLock = false; // Whether the angle of the wheels are locked at ninety degrees or not
+    zeroLock = false; // Whether the angle of the wheels are locked at zero degrees or not
 
     field = new Field2d();
 
+    // Magic that zeros the gyro upon startup.
     new Thread(() -> {
       try {
         Thread.sleep(1000);
@@ -137,33 +138,55 @@ public class SwerveDrive extends SubsystemBase {
     configureAutoBuilder();
   } 
 
-  public void resetFrontLeft() {
+  /**
+   * Zero the modules
+   */
+  public void zeroModules() {
     frontLeft.resetEncoder();
     frontRight.resetEncoder();
     backLeft.resetEncoder();
     backRight.resetEncoder();
   }
 
+  /**
+   * Returns an AHRS object representing the gyro.
+   */
   public AHRS getGyro() {
     return gyro;
   }
 
+  /**
+   * @return heading of the robot based upon the gyro.
+   */
   public double getHeading() {
     return Math.IEEEremainder(gyro.getAngle(), 360);
   }
 
+  /**
+   * Zeros the gyro
+   */
   private void zeroHeading() {
     gyro.reset();
   }
 
+  /**
+   * @return A Rotation2d object representing the robot's heading from radians.
+   */
   public Rotation2d getRotation2d() {
     return Rotation2d.fromRadians(getHeading() * (Math.PI / 180));
   }
 
+  /**
+   * @return A Pose2d object representing the position of the robot on the field.
+   */
   public Pose2d getPose() {
     return swerveOdometry.getPoseMeters();
   }
 
+  /**
+   * Reset the odometry based on the angle, module positions, and pose.
+   * @param pose
+   */
   public void resetOdometry(Pose2d pose) {
     swerveOdometry.resetPosition(getRotation2d(), getModulePositions(), pose);
   }
@@ -180,6 +203,9 @@ public class SwerveDrive extends SubsystemBase {
     backRight.setDesiredState(desiredStates[3]);
   }
 
+  /**
+   * @return An array of SwerveModulePosition objects containing the current drive and rotate motor positions for their respective modules.
+   */
   public SwerveModulePosition[] getModulePositions() {
     SwerveModulePosition[] positions = {new SwerveModulePosition(), new SwerveModulePosition(), new SwerveModulePosition(), new SwerveModulePosition()};
     positions[0] = new SwerveModulePosition(frontLeft.getDrivePosition(), new Rotation2d(frontLeft.getRotatePosition()));
@@ -189,6 +215,9 @@ public class SwerveDrive extends SubsystemBase {
     return positions;
   }
 
+  /**
+   * @return An array of SwerveModuleState objects containing the current drive and rotate motor velocities for their respective modules.
+   */
   public SwerveModuleState[] getModuleStates() {
     SwerveModuleState[] states = {new SwerveModuleState(), new SwerveModuleState(), new SwerveModuleState(), new SwerveModuleState()};
     states[0] = new SwerveModuleState(frontLeft.getDriveVelocity(), new Rotation2d(frontLeft.getRotatePosition()));
@@ -198,6 +227,9 @@ public class SwerveDrive extends SubsystemBase {
     return states;
   }
 
+  /**
+   * Set the module states all to zero degrees and zero velocity.
+   */
   public Command goToZero() {
     return run(() -> {
       SwerveModuleState[] zeroStates = {new SwerveModuleState(), new SwerveModuleState(), new SwerveModuleState(), new SwerveModuleState()};
@@ -205,6 +237,9 @@ public class SwerveDrive extends SubsystemBase {
     });
   }
 
+  /**
+   * Rotate the robot toward the amp (nintey degrees or -ninety degrees) depending on the alliance.
+   */
   public Command rotateToAmp() {
     boolean redAlliance = shouldFlip(); // Depending on the starting alliance side, the amp would be at different angle. Account for that.
     RotateToAngle rotate = redAlliance ? new RotateToAngle(90, this) : new RotateToAngle(-90, this); // If red, go to 90. If blue, go to -90.
@@ -212,10 +247,16 @@ public class SwerveDrive extends SubsystemBase {
     return rotate;
   }
 
+  /**
+   * Rotate the robot toward the speaker (zero degrees)
+   */
   public Command rotateToSpeaker() {
     return new RotateToAngle(0, this);
   }
 
+  /**
+   * Set all motor velocities to zero.
+   */
   public void stopModules() {
     frontLeft.stop();
     frontRight.stop();
@@ -223,26 +264,34 @@ public class SwerveDrive extends SubsystemBase {
     backRight.stop();
   }
 
+  /**
+   * Toggle field oriented
+   */
   public Command toggleFieldOriented() {
-    return runEnd(()-> {}, () -> {fieldOriented = !fieldOriented; lastAngle = getHeading();});
+    return runEnd(()-> {}, () -> {fieldOriented = !fieldOriented;});
   }
 
-  public double getLastAngle(){
-    return lastAngle;
-  }
-
+  /**
+   * @return The current state of field oriented mode
+   */
   public boolean getFieldOriented() {
     return fieldOriented;
-  }
-
-  public boolean getSlowMode() {
-    return slowMode;
   }
 
   public Command toggleSlowMode() {
     return runEnd(() -> {}, () -> slowMode = !slowMode);
   }
 
+  /**
+   * @return The current state of slow mode.
+   */
+  public boolean getSlowMode() {
+    return slowMode;
+  }
+
+  /**
+   * Toggle ninety lock mode.
+   */
   public Command toggleNinetyLock() {
     return runEnd(() -> {
       ninetyLock = true;
@@ -251,6 +300,9 @@ public class SwerveDrive extends SubsystemBase {
     });
   }
 
+  /**
+   * Toggle zero lock mode.
+   */
   public Command toggleZeroLock() {
     return runEnd(() -> {
       zeroLock = true;
@@ -259,24 +311,18 @@ public class SwerveDrive extends SubsystemBase {
     });
   }
 
+  /**
+   * @return A ChassisSpeeds object representing the current x and y velocity in meters/second and the rotation velocity in radians/second
+   */
   public ChassisSpeeds getChassisSpeeds() {
     return new ChassisSpeeds(chassisSpeeds.vxMetersPerSecond, chassisSpeeds.vyMetersPerSecond, chassisSpeeds.omegaRadiansPerSecond);
   }
-
-  public void drive(double xInput, double yInput, double rotateInput) {
-    double xSpeed = xLimiter.calculate(xInput) * MAX_DRIVE_SPEED;
-    double ySpeed = yLimiter.calculate(yInput) * MAX_DRIVE_SPEED;
-    double rotateSpeed = rotateLimiter.calculate(rotateInput) * MAX_ROTATE_SPEED;
-
-    if(fieldOriented) {
-      chassisSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(xSpeed, ySpeed, rotateSpeed, getGyro().getRotation2d());
-    } else {
-      chassisSpeeds = new ChassisSpeeds(xSpeed, ySpeed, rotateSpeed);
-      }
-    SwerveModuleState moduleStates[] = KINEMATICS.toSwerveModuleStates(chassisSpeeds);
-    setModuleStates(moduleStates, MAX_DRIVE_SPEED);
-  }
-    
+   
+  /**
+   * Drive each motor at a set speed without going over the set maximum.
+   * @param speeds to input into the motors.
+   * @param maxDriveSpeed the highest velocity the robot is allowed to drive during function.
+   */
   public void drive(ChassisSpeeds speeds, double maxDriveSpeed) {
     chassisSpeeds = new ChassisSpeeds(-speeds.vxMetersPerSecond, -speeds.vyMetersPerSecond, speeds.omegaRadiansPerSecond);
     chassisSpeeds = ChassisSpeeds.discretize(chassisSpeeds, 0.02);
@@ -285,6 +331,9 @@ public class SwerveDrive extends SubsystemBase {
     setModuleStates(moduleStates, maxDriveSpeed);
   }
 
+  /**
+   * @return True when the robot's alliance is red. False when the robot's alliance is blue.
+   */
   public boolean shouldFlip() {
     var alliance = DriverStation.getAlliance();
     if (alliance.isPresent()) {
@@ -293,6 +342,9 @@ public class SwerveDrive extends SubsystemBase {
     return false;
   }
 
+  /**
+   * Set all motors to brake mode.
+   */
   public void setBrakeMode() {
     frontLeft.setBrakeMode();
     frontRight.setBrakeMode();
@@ -300,6 +352,9 @@ public class SwerveDrive extends SubsystemBase {
     backRight.setBrakeMode();
   }
 
+  /**
+   * Set all motors to coast mode.
+   */
   public void setCoastMode() {
     frontLeft.setCoastMode();
     frontRight.setCoastMode();

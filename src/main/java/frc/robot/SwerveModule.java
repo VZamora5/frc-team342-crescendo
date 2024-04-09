@@ -34,16 +34,22 @@ public class SwerveModule extends SubsystemBase {
 
   private double encoderOffset;
 
-  /** Creates a new SwerveModule. */
+  /**
+   * @param driveID Drive Motor ID for the module
+   * @param rotateID Rotate Motor ID for the module
+   * @param magEncoderPort Absolute Encoder Port
+   * @param invertRotate True only if the rotation is backwards
+   * @param invertDrive True only if the driving is backwards
+   * @param encoderOffset Amount that the rotation is off by when bevel gears are on the outside and the wheel is facing forward. Obtained through getOffsets().
+   * @param PID_values PID values for the module.
+   */
   public SwerveModule(int driveID, int rotateID, int magEncoderPort, boolean invertRotate, boolean invertDrive, double encoderOffset, double[] PID_values) {
     
-    // System.out.println("Drive: " + driveID + " rotate: " + rotateID);
     driveMotor = new CANSparkMax(driveID, MotorType.kBrushless);
     rotateMotor = new CANSparkMax(rotateID, MotorType.kBrushless);
 
     driveMotor.setSmartCurrentLimit(60);
     rotateMotor.setSmartCurrentLimit(60);
-    
 
     this.encoderOffset = encoderOffset;
 
@@ -54,17 +60,17 @@ public class SwerveModule extends SubsystemBase {
     rotateMotor.setInverted(invertRotate);
 
     driveEncoder = driveMotor.getEncoder();
-    driveEncoder.setPositionConversionFactor(DriveConstants.DRIVE_POSITION_CONVERSION);
-    driveEncoder.setVelocityConversionFactor(DriveConstants.DRIVE_VELOCITY_CONVERSION);
+    driveEncoder.setPositionConversionFactor(DriveConstants.DRIVE_POSITION_CONVERSION); // Converts raw encoder values to meters
+    driveEncoder.setVelocityConversionFactor(DriveConstants.DRIVE_VELOCITY_CONVERSION); // Converts raw encoder values to meters/second
 
     rotateEncoder = rotateMotor.getEncoder();
-    rotateEncoder.setPositionConversionFactor(DriveConstants.ROTATE_POSITION_CONVERSION);
-    rotateEncoder.setVelocityConversionFactor(DriveConstants.ROTATE_VELOCITY_CONVERSION);
+    rotateEncoder.setPositionConversionFactor(DriveConstants.ROTATE_POSITION_CONVERSION); // Converts raw encoder values to radians
+    rotateEncoder.setVelocityConversionFactor(DriveConstants.ROTATE_VELOCITY_CONVERSION); // Concerts raw encoder values to radians/second
 
     absoluteEncoder = new AnalogInput(magEncoderPort);
 
     rotateController = new PIDController(PID_values[0], PID_values[1], PID_values[2]);
-    rotateController.enableContinuousInput(-Math.PI, Math.PI);
+    rotateController.enableContinuousInput(-Math.PI, Math.PI); // Limits the inputed controller angle between -180 and 180 (-PI and PI)
 
     resetEncoder();
   }
@@ -109,7 +115,7 @@ public class SwerveModule extends SubsystemBase {
   }
 
   /** 
-   * @return Encoder angles with offsets.
+   * @return The rotation offset (ONLY when the bevel gear is outward and the wheel is forward-facing).
   */
   public double getOffsets() {
     double angle = absoluteEncoder.getVoltage() / RobotController.getVoltage5V();
@@ -118,16 +124,26 @@ public class SwerveModule extends SubsystemBase {
     return angle * (absEncoderReverse ? -1.0 : 1.0); 
   }
 
+  /**
+   * Zeros the drive and rotate encoder positions.
+   */
   public void resetEncoder() {
     driveEncoder.setPosition(0);
     rotateEncoder.setPosition(getAbsoluteEncoderRad());
   }
 
+  /**
+   * Stop drive and rotate motion
+   */
   public void stop() {
     driveMotor.set(0);
     rotateMotor.set(0);
   }
 
+  /**
+   * Return a SwerveModuleState object that represents the current drive velocity and rotate motor position.
+   * @return an object representing the drive velocity and rotate motor position.
+   */
   public SwerveModuleState getState() {
     return new SwerveModuleState(getDriveVelocity(), new Rotation2d(getRotatePosition()));
   }
@@ -146,11 +162,17 @@ public class SwerveModule extends SubsystemBase {
     rotateMotor.set(rotateController.calculate(getRotatePosition(), state.angle.getRadians()));
   }
 
+  /**
+   * Set the drive and rotate motors' idle mode to coast
+   */
   public void setCoastMode() {
     driveMotor.setIdleMode(IdleMode.kCoast);
     rotateMotor.setIdleMode(IdleMode.kCoast);
   }
 
+  /**
+   * Set the drive and rotate motors' idle mode to brake.
+   */
   public void setBrakeMode() {
     driveMotor.setIdleMode(IdleMode.kBrake);
     rotateMotor.setIdleMode(IdleMode.kBrake);
